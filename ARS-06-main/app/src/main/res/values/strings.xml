@@ -1,0 +1,41 @@
+<resources>
+    <string name="app_name">ARS</string>
+    <string name="status_active">SYSTEM ACTIVE</string>
+    <string name="status_loading_model">Status: Loading Voice Model...</string>
+    <string name="status_error_model">SYSTEM ERROR: MODEL</string>
+    <string name="status_gps_synced">SYSTEM ACTIVE / GPS SYNCED</string>
+    <string name="status_sos_triggered">SOS TRIGGERED!</string>
+    <string name="status_network_error">Status: Network Error</string>
+    <string name="status_manual_alert">Status: Manual Alert...</string>
+    <string name="status_alert_transmitted">ALERT TRANSMITTED (%1$d)</string>
+
+    <string name="lat_acquiring">LAT: ACQUIRING...</string>
+    <string name="lon_acquiring">LON: ACQUIRING...</string>
+    <string name="lat_format">LAT: %1$.6f</string>
+    <string name="lon_format">LON: %1$.6f</string>
+
+    <string name="battery_initial">BATTERY: --%</string>
+    <string name="battery_format">BATTERY: %1$d%%</string>
+
+    <string name="timestamp_initial">T-ZERO: --</string>
+    <string name="timestamp_format">T-ZERO: %1$s</string>
+
+    <string name="listening_keywords">LISTENING FOR KEYWORDS...</string>
+    <string name="manual_recording">Manual Recording...</string>
+    <string name="model_loading">Model loading...</string>
+
+    <string name="source_format">SOURCE: %1$s</string>
+    <string name="captured_format">CAPTURED: %1$s</string>
+    <string name="sos_sent_success">Emergency Alert Sent Successfully!</string>
+
+    <string name="trigger_manual">Manual Button Trigger</string>
+    <string name="trigger_volume_accessibility">Accessibility Volume Trigger</string>
+    <string name="trigger_volume_triple">Volume Button Triple Press</string>
+    <string name="trigger_voice_format">Voice Keyword (%1$s)</string>
+
+    <string name="sos_button_text">SOS</string>
+    <string name="sos_pulse_ring">SOS Pulse Ring</string>
+    <string name="back_button_desc">Back</string>
+    <string name="emergency_message_format">Emergency (%1$s)</string>
+    <string name="sos_display_format">Original: %1$s\n\nEncrypted: %2$s</string>
+</resources>

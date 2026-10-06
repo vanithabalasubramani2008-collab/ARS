@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/bg_gradient"
+    android:padding="20dp"
+    android:gravity="center_horizontal">
+
+    <!-- Top Status Section -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/status_bar_bg"
+        android:padding="10dp"
+        android:layout_marginBottom="16dp">
+
+        <ImageButton
+            android:id="@+id/btnBack"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="start|center_vertical"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_back"
+            android:contentDescription="@string/back_button_desc"
+            android:padding="8dp"
+            android:scaleType="fitCenter"/>
+
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="@string/status_active"
+            android:textColor="@color/cyan_accent"
+            android:textSize="14sp"
+            android:letterSpacing="0.2"
+            android:fontFamily="@font/orbitron"/>
+    </FrameLayout>
+
+    <!-- Data Glass Card -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="30dp"
+        android:clipChildren="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/card_info_bg"
+            android:padding="20dp">
+
+            <TextView
+                android:id="@+id/tvLat"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/lat_acquiring"
+                android:textColor="@color/text_premium"
+                android:fontFamily="@font/rajdhani"
+                android:textSize="16sp"
+                android:layout_marginBottom="4dp"/>
+
+            <TextView
+                android:id="@+id/tvLon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/lon_acquiring"
+                android:textColor="@color/text_premium"
+                android:fontFamily="@font/rajdhani"
+                android:textSize="16sp"
+                android:layout_marginBottom="4dp"/>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#1AFFFFFF"
+                android:layout_marginVertical="10dp"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tvBattery"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/battery_initial"
+                    android:textColor="@color/cyan_accent"
+                    android:fontFamily="@font/rajdhani"
+                    android:textSize="14sp"/>
+
+                <TextView
+                    android:id="@+id/tvTimestamp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/timestamp_initial"
+                    android:textColor="@color/text_label"
+                    android:fontFamily="@font/rajdhani"
+                    android:textSize="14sp"/>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Scanning Effect -->
+        <View
+            android:id="@+id/scanline"
+            android:layout_width="match_parent"
+            android:layout_height="2dp"
+            android:background="@color/cyan_accent"
+            android:alpha="0.6"/>
+    </FrameLayout>
+
+    <!-- Voice Visualizer Context -->
+    <TextView
+        android:id="@+id/voiceText"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:text="@string/listening_keywords"
+        android:textSize="18sp"
+        android:letterSpacing="0.05"
+        android:gravity="center"
+        android:textColor="@color/text_label"
+        android:fontFamily="@font/exo2"
+        android:layout_marginBottom="20dp"/>
+
+    <Button
+        android:id="@+id/relayButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/relay_off"
+        android:layout_marginBottom="8dp" />
+
+    <Button
+        android:id="@+id/bluetoothHelpButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Show help in Bluetooth list"
+        android:visibility="gone"
+        android:layout_marginBottom="8dp" />
+
+    <!-- The SOS Core -->
+    <FrameLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="50dp">
+
+        <ImageView
+            android:id="@+id/pulseRing"
+            android:layout_width="220dp"
+            android:layout_height="220dp"
+            android:layout_gravity="center"
+            android:src="@drawable/pulse_ring"
+            android:visibility="visible"
+            android:contentDescription="@string/sos_pulse_ring"/>
+
+        <Button
+            android:id="@+id/sosButton"
+            android:layout_width="160dp"
+            android:layout_height="160dp"
+            android:layout_gravity="center"
+            android:text="@string/sos_button_text"
+            android:textSize="32sp"
+            android:letterSpacing="0.1"
+            android:textColor="@color/white"
+            android:fontFamily="@font/orbitron"
+            android:background="@drawable/sos_circle"
+            android:backgroundTint="@null"
+            android:elevation="10dp"
+            android:stateListAnimator="@null"/>
+    </FrameLayout>
+
+</LinearLayout>

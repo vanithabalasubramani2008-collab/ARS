@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Backgrounds -->
+    <color name="bg_dark">#050508</color>
+    <color name="bg_radial_center">#1A0000</color>
+    <color name="panel_bg">#0F0F12</color>
+
+    <!-- Primary SOS Red (High Intensity) -->
+    <color name="primary_red">#FF1744</color>
+    <color name="red_glow">#4DFF1744</color>
+    <color name="red_border_low">#30FF1744</color>
+    <color name="button_core_start">#3D0000</color>
+    <color name="button_core_end">#0A0000</color>
+
+    <!-- Cyan Accents (Futuristic) -->
+    <color name="cyan_accent">#00E5FF</color>
+    <color name="cyan_glow">#4D00E5FF</color>
+    <color name="cyan_border_low">#6600E5FF</color>
+
+    <!-- Typography -->
+    <color name="text_premium">#F0F0F0</color>
+    <color name="text_label">#BBBBBB</color>
+    <color name="text_red_glow">#FF1744</color>
+    <color name="text_cyan_glow">#00E5FF</color>
+
+    <!-- UI Elements -->
+    <color name="card_bg_glass">#08FFFFFF</color>
+    <color name="card_border_glow">#30FF1744</color>
+
+    <!-- Battery Logic -->
+    <color name="battery_full">#00E676</color>
+    <color name="battery_mid">#FFEA00</color>
+    <color name="battery_low">#FF1744</color>
+
+    <!-- Standard Overrides -->
+    <color name="black">#050508</color>
+    <color name="white">#F0F0F0</color>
+</resources>
