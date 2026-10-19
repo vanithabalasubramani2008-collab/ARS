@@ -145,13 +145,6 @@ public class SOSService extends Service {
         sb.append("EMERGENCY SOS ALERT!\n\n");
         sb.append("An SOS has been triggered from the ARS application. Please contact the user immediately and provide assistance.\n\n");
 
-        if (customDetails != null && !customDetails.trim().isEmpty() &&
-                !customDetails.equalsIgnoreCase("Manual Alert") &&
-                !customDetails.equalsIgnoreCase("Emergency") &&
-                !customDetails.toLowerCase().contains("accessibility volume")) {
-            sb.append("Details: ").append(customDetails.trim()).append("\n\n");
-        }
-
         if (lat != 0.0 || lon != 0.0) {
             sb.append("Latitude: ").append(lat).append("\n");
             sb.append("Longitude: ").append(lon).append("\n");
@@ -188,18 +181,18 @@ public class SOSService extends Service {
             try {
                 SmsManager smsManager = SmsManager.getDefault();
 
-                // 1. Default encrypted recipient: +919940333423 — ENCRYPTED SMS (AES-GCM)
+                // 1. Secondary recipient 9940541394 — READABLE EMERGENCY SMS
+                String secondaryReadableRecipient = "+919940541394";
+                sendSmsToRecipient(smsManager, secondaryReadableRecipient, canonicalMessage);
+                Log.i(TAG, "Readable SMS dispatched to secondary recipient: " + secondaryReadableRecipient);
+
+                // 2. Default recipient 9940333423 — ENCRYPTED EMERGENCY SMS (AES-GCM)
                 String encryptedMsg = AesGcmEncryptionHelper.encrypt(canonicalMessage);
                 String defaultEncryptedRecipient = "+919940333423";
                 sendSmsToRecipient(smsManager, defaultEncryptedRecipient, encryptedMsg);
                 Log.i(TAG, "Encrypted AES-GCM SMS dispatched to default recipient: " + defaultEncryptedRecipient);
 
-                // 2. Secondary readable recipient: +919940541394 — READABLE SMS
-                String secondaryReadableRecipient = "+919940541394";
-                sendSmsToRecipient(smsManager, secondaryReadableRecipient, canonicalMessage);
-                Log.i(TAG, "Readable SMS dispatched to secondary recipient: " + secondaryReadableRecipient);
-
-                // 3. User-configured additional emergency number(s) — READABLE SMS (with duplicate prevention)
+                // 3. User-configured additional emergency number — READABLE SMS (with duplicate prevention)
                 SharedPreferences prefs = getSharedPreferences("EmergencyContacts", MODE_PRIVATE);
                 Set<String> userContacts = prefs.getStringSet("phone_numbers", new HashSet<>());
                 for (String contact : userContacts) {
@@ -317,7 +310,7 @@ public class SOSService extends Service {
         getSharedPreferences(STATUS_PREFS, MODE_PRIVATE).edit().putString(EXTRA_STATUS, message).apply();
     }
 
-@Nullable @Override public IBinder onBind(Intent intent) { return null; }
+    @Nullable @Override public IBinder onBind(Intent intent) { return null; }
     @Override public void onDestroy() {
         if (nearby != null) nearby.stop();
         if (networkCallbackRegistered) connectivity.unregisterNetworkCallback(networkCallback);
