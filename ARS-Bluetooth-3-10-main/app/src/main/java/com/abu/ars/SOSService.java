@@ -181,16 +181,25 @@ public class SOSService extends Service {
             try {
                 SmsManager smsManager = SmsManager.getDefault();
 
-                // 1. Secondary recipient 9940541394 — READABLE EMERGENCY SMS
+                // 1. Secondary recipient +919940541394 — READABLE EMERGENCY SMS
                 String secondaryReadableRecipient = "+919940541394";
-                sendSmsToRecipient(smsManager, secondaryReadableRecipient, canonicalMessage);
-                Log.i(TAG, "Readable SMS dispatched to secondary recipient: " + secondaryReadableRecipient);
+                Log.i(TAG, "[SMS] Routing readable emergency SMS to secondary recipient: " + secondaryReadableRecipient + " (Length: " + canonicalMessage.length() + ")");
+                sendSmsToRecipient(smsManager, secondaryReadableRecipient, canonicalMessage, false);
 
-                // 2. Default recipient 9940333423 — ENCRYPTED EMERGENCY SMS (AES-GCM)
-                String encryptedMsg = AesGcmEncryptionHelper.encrypt(canonicalMessage);
-                String defaultEncryptedRecipient = "+919940333423";
-                sendSmsToRecipient(smsManager, defaultEncryptedRecipient, encryptedMsg);
-                Log.i(TAG, "Encrypted AES-GCM SMS dispatched to default recipient: " + defaultEncryptedRecipient);
+                // 2. Default encrypted recipients: +919940333423 and +919080116464 — ENCRYPTED EMERGENCY SMS (AES-GCM)
+                String encryptedMsg;
+                try {
+                    encryptedMsg = AesGcmEncryptionHelper.encrypt(canonicalMessage);
+                    Log.i(TAG, "[SMS] Encryption success for encrypted recipients. Ciphertext length: " + encryptedMsg.length());
+                } catch (Exception encEx) {
+                    Log.e(TAG, "[SMS] Encryption failed for encrypted recipients", encEx);
+                    throw new RuntimeException("Encryption failure: " + encEx.getMessage(), encEx);
+                }
+                String[] encryptedRecipients = new String[] { "+919940333423", "+919080116464" };
+                for (String encRecipient : encryptedRecipients) {
+                    sendSmsToRecipient(smsManager, encRecipient, encryptedMsg, true);
+                    Log.i(TAG, "Encrypted AES-GCM SMS dispatched to: " + encRecipient);
+                }
 
                 // 3. User-configured additional emergency number — READABLE SMS (with duplicate prevention)
                 SharedPreferences prefs = getSharedPreferences("EmergencyContacts", MODE_PRIVATE);
@@ -198,24 +207,61 @@ public class SOSService extends Service {
                 for (String contact : userContacts) {
                     if (contact == null || contact.trim().isEmpty()) continue;
                     String normalizedContact = normalizePhone(contact);
-                    if (!normalizedContact.equals(defaultEncryptedRecipient) && !normalizedContact.equals(secondaryReadableRecipient)) {
-                        sendSmsToRecipient(smsManager, normalizedContact, canonicalMessage);
-                        Log.i(TAG, "Readable SMS dispatched to user-configured contact: " + normalizedContact);
+                    boolean isEncryptedRecipient = false;
+                    for (String enc : encryptedRecipients) {
+                        if (normalizedContact.equals(enc)) {
+                            isEncryptedRecipient = true;
+                            break;
+                        }
+                    }
+                    if (!isEncryptedRecipient && !normalizedContact.equals(secondaryReadableRecipient)) {
+                        Log.i(TAG, "[SMS] Routing readable emergency SMS to user-configured contact: " + normalizedContact);
+                        sendSmsToRecipient(smsManager, normalizedContact, canonicalMessage, false);
                     }
                 }
 
             } catch (Exception e) {
                 Log.e(TAG, "Failed to send recipient-specific SMS", e);
+                status("SMS sending failed: " + e.getMessage());
             }
+        } else {
+            Log.w(TAG, "SEND_SMS permission not granted; cannot dispatch SMS.");
+            status("SMS failed: SEND_SMS permission denied");
         }
     }
 
-    private void sendSmsToRecipient(SmsManager smsManager, String recipient, String text) {
-        ArrayList<String> parts = smsManager.divideMessage(text);
-        if (parts.size() > 1) {
-            smsManager.sendMultipartTextMessage(recipient, null, parts, null, null);
-        } else {
-            smsManager.sendTextMessage(recipient, null, text, null, null);
+    private void sendSmsToRecipient(SmsManager smsManager, String recipient, String text, boolean isEncrypted) {
+        try {
+            ArrayList<String> parts = smsManager.divideMessage(text);
+            PendingIntent sentIntent = PendingIntent.getBroadcast(
+                    this,
+                    recipient.hashCode(),
+                    new Intent("com.abu.ars.ACTION_SMS_SENT").putExtra("recipient", recipient),
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+            );
+            PendingIntent deliveredIntent = PendingIntent.getBroadcast(
+                    this,
+                    recipient.hashCode(),
+                    new Intent("com.abu.ars.ACTION_SMS_DELIVERED").putExtra("recipient", recipient),
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+            );
+
+            if (parts.size() > 1) {
+                ArrayList<PendingIntent> sentIntents = new ArrayList<>();
+                ArrayList<PendingIntent> deliveredIntents = new ArrayList<>();
+                for (int i = 0; i < parts.size(); i++) {
+                    sentIntents.add(sentIntent);
+                    deliveredIntents.add(deliveredIntent);
+                }
+                smsManager.sendMultipartTextMessage(recipient, null, parts, sentIntents, deliveredIntents);
+            } else {
+                smsManager.sendTextMessage(recipient, null, text, sentIntent, deliveredIntent);
+            }
+            Log.i(TAG, "[SMS] Dispatched " + (isEncrypted ? "encrypted" : "readable") + " message to " + recipient + " (Parts: " + parts.size() + ")");
+            status("SMS submitted to " + recipient);
+        } catch (Exception e) {
+            Log.e(TAG, "[SMS] Error dispatching to " + recipient, e);
+            status("SMS error for " + recipient + ": " + e.getMessage());
         }
     }
 
