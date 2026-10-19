@@ -17,6 +17,7 @@ import android.net.NetworkCapabilities;
 import android.os.BatteryManager;
 import android.os.Build;
 import android.os.IBinder;
+import android.telephony.SmsManager;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
@@ -31,8 +32,11 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -50,7 +54,8 @@ public class SOSService extends Service {
     static final String ENABLED = "enabled";
     private static final String TAG = "SOS_SERVICE";
     private static final String CHANNEL_ID = "ARS_RELAY";
-    private static final String BACKEND_URL = "https://defile-blip-snowbird.ngrok-free.dev/sos";
+    private static final String DEFAULT_BACKEND_URL = "http://10.127.154.187:5000/sos";
+
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private SosStore store;
     private NearbyRelay nearby;
@@ -65,12 +70,19 @@ public class SOSService extends Service {
         }
     };
 
+    private String getBackendUrl() {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        return prefs.getString("backend_url", DEFAULT_BACKEND_URL);
+    }
+
     @Override public void onCreate() {
         super.onCreate();
         store = new SosStore(this);
         connectivity = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         NotificationManager nm = getSystemService(NotificationManager.class);
-        nm.createNotificationChannel(new NotificationChannel(CHANNEL_ID, "ARS emergency relay", NotificationManager.IMPORTANCE_LOW));
+        if (nm != null) {
+            nm.createNotificationChannel(new NotificationChannel(CHANNEL_ID, "ARS emergency relay", NotificationManager.IMPORTANCE_LOW));
+        }
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
@@ -128,6 +140,92 @@ public class SOSService extends Service {
                 .setContentIntent(pending).setOngoing(true).build();
     }
 
+    private String buildEmergencySmsText(double lat, double lon, int battery, String timestamp, String customDetails) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("EMERGENCY SOS ALERT!\n\n");
+        sb.append("An SOS has been triggered from the ARS application. Please contact the user immediately and provide assistance.\n\n");
+
+        if (customDetails != null && !customDetails.trim().isEmpty() &&
+                !customDetails.equalsIgnoreCase("Manual Alert") &&
+                !customDetails.equalsIgnoreCase("Emergency") &&
+                !customDetails.toLowerCase().contains("accessibility volume")) {
+            sb.append("Details: ").append(customDetails.trim()).append("\n\n");
+        }
+
+        if (lat != 0.0 || lon != 0.0) {
+            sb.append("Latitude: ").append(lat).append("\n");
+            sb.append("Longitude: ").append(lon).append("\n");
+        } else {
+            sb.append("Latitude: Location Unavailable\n");
+            sb.append("Longitude: Location Unavailable\n");
+        }
+
+        sb.append("Battery: ").append(battery).append("%\n");
+        sb.append("Timestamp: ").append(timestamp).append("\n");
+
+        if (lat != 0.0 || lon != 0.0) {
+            sb.append("Location: https://maps.google.com/?q=").append(lat).append(",").append(lon);
+        }
+
+        return sb.toString();
+    }
+
+    private String normalizePhone(String phone) {
+        if (phone == null) return "";
+        String trimmed = phone.trim();
+        if (trimmed.startsWith("+")) {
+            return "+" + trimmed.replaceAll("\\D", "");
+        }
+        String digits = trimmed.replaceAll("\\D", "");
+        if (digits.length() == 10) {
+            return "+91" + digits;
+        }
+        return "+" + digits;
+    }
+
+    private void sendRecipientSpecificSms(String canonicalMessage) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED) {
+            try {
+                SmsManager smsManager = SmsManager.getDefault();
+
+                // 1. Default encrypted recipient: +919940333423 — ENCRYPTED SMS (AES-GCM)
+                String encryptedMsg = AesGcmEncryptionHelper.encrypt(canonicalMessage);
+                String defaultEncryptedRecipient = "+919940333423";
+                sendSmsToRecipient(smsManager, defaultEncryptedRecipient, encryptedMsg);
+                Log.i(TAG, "Encrypted AES-GCM SMS dispatched to default recipient: " + defaultEncryptedRecipient);
+
+                // 2. Secondary readable recipient: +919940541394 — READABLE SMS
+                String secondaryReadableRecipient = "+919940541394";
+                sendSmsToRecipient(smsManager, secondaryReadableRecipient, canonicalMessage);
+                Log.i(TAG, "Readable SMS dispatched to secondary recipient: " + secondaryReadableRecipient);
+
+                // 3. User-configured additional emergency number(s) — READABLE SMS (with duplicate prevention)
+                SharedPreferences prefs = getSharedPreferences("EmergencyContacts", MODE_PRIVATE);
+                Set<String> userContacts = prefs.getStringSet("phone_numbers", new HashSet<>());
+                for (String contact : userContacts) {
+                    if (contact == null || contact.trim().isEmpty()) continue;
+                    String normalizedContact = normalizePhone(contact);
+                    if (!normalizedContact.equals(defaultEncryptedRecipient) && !normalizedContact.equals(secondaryReadableRecipient)) {
+                        sendSmsToRecipient(smsManager, normalizedContact, canonicalMessage);
+                        Log.i(TAG, "Readable SMS dispatched to user-configured contact: " + normalizedContact);
+                    }
+                }
+
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to send recipient-specific SMS", e);
+            }
+        }
+    }
+
+    private void sendSmsToRecipient(SmsManager smsManager, String recipient, String text) {
+        ArrayList<String> parts = smsManager.divideMessage(text);
+        if (parts.size() > 1) {
+            smsManager.sendMultipartTextMessage(recipient, null, parts, null, null);
+        } else {
+            smsManager.sendTextMessage(recipient, null, text, null, null);
+        }
+    }
+
     private void enqueue(String full, String compressed, double lat, double lon) {
         try {
             BatteryManager batteryManager = (BatteryManager) getSystemService(BATTERY_SERVICE);
@@ -135,22 +233,34 @@ public class SOSService extends Service {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
             sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
             String timestamp = sdf.format(new Date());
+
+            String completeSmsText = buildEmergencySmsText(lat, lon, battery, timestamp, full);
+            sendRecipientSpecificSms(completeSmsText);
+
             JSONObject encrypted = new JSONObject()
                     .put("latitude", EncryptionHelper.encrypt(Double.toString(lat)))
                     .put("longitude", EncryptionHelper.encrypt(Double.toString(lon)))
-                    .put("message", EncryptionHelper.encrypt((compressed == null ? "Emergency" : compressed).replaceAll("[^\\p{ASCII}]", "")))
+                    .put("message", EncryptionHelper.encrypt(completeSmsText))
                     .put("battery", EncryptionHelper.encrypt(Integer.toString(battery)))
                     .put("timestamp", EncryptionHelper.encrypt(timestamp));
+
             JSONObject payload = new JSONObject()
                     .put("id", "SOS-" + UUID.randomUUID())
+                    .put("latitude", lat)
+                    .put("longitude", lon)
+                    .put("message", completeSmsText)
+                    .put("battery", battery)
+                    .put("timestamp", timestamp)
                     .put("encryptedData", encrypted)
                     .put("metadata", new JSONObject().put("compression", "keyword-compression")
                             .put("encryption", "AES-256-CBC").put("version", "1.0"));
+
             JSONObject envelope = new JSONObject().put("id", payload.getString("id"))
                     .put("createdAt", System.currentTimeMillis()).put("hops", 0)
                     .put("own", true).put("payload", payload);
+
             if (store.put(envelope)) {
-                status("SOS saved; searching for a delivery route");
+                status("SOS saved; uploading to server...");
                 if (nearby != null) nearby.forwardPending();
                 uploadPending();
             }
@@ -168,11 +278,12 @@ public class SOSService extends Service {
     private void uploadPending() {
         if (uploading || !hasInternet()) return;
         uploading = true;
+        String backendUrl = getBackendUrl();
         try {
             for (JSONObject envelope : store.pending()) {
                 HttpURLConnection conn = null;
                 try {
-                    conn = (HttpURLConnection) new URL(BACKEND_URL).openConnection();
+                    conn = (HttpURLConnection) new URL(backendUrl).openConnection();
                     conn.setConnectTimeout(8000);
                     conn.setReadTimeout(8000);
                     conn.setRequestMethod("POST");
@@ -188,9 +299,14 @@ public class SOSService extends Service {
                         status("SOS " + envelope.getString("id") + " accepted by server");
                     } else {
                         Log.w(TAG, "SOS server returned HTTP " + code);
+                        status("SOS queued (Server HTTP " + code + ")");
                         break;
                     }
-                } catch (Exception e) { Log.w(TAG, "SOS queued for another attempt", e); break; }
+                } catch (Exception e) {
+                    Log.w(TAG, "SOS queued for another attempt: " + e.getMessage());
+                    status("SOS saved locally (Queued for upload)");
+                    break;
+                }
                 finally { if (conn != null) conn.disconnect(); }
             }
         } finally { uploading = false; }
@@ -201,7 +317,7 @@ public class SOSService extends Service {
         getSharedPreferences(STATUS_PREFS, MODE_PRIVATE).edit().putString(EXTRA_STATUS, message).apply();
     }
 
-    @Nullable @Override public IBinder onBind(Intent intent) { return null; }
+@Nullable @Override public IBinder onBind(Intent intent) { return null; }
     @Override public void onDestroy() {
         if (nearby != null) nearby.stop();
         if (networkCallbackRegistered) connectivity.unregisterNetworkCallback(networkCallback);
